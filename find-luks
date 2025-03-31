@@ -1,0 +1,32 @@
+#!/usr/bin/env perl
+
+# Tries to find a LUKS header on a damaged/deleted/overwritten blockdevice
+
+# Install pv for progress bar.
+# Usage: pv -beprt /dev/sdc | 1find-luks
+
+my $magic_string="LUKS\xba\xbe";
+my $block_size=1048576;
+my $debug=0;
+
+BEGIN {
+    $/ = \$block_size;
+}
+
+my $block_iterator;
+my $found_index;
+
+while (<>) {
+    $block_iterator = 0;
+    while ( ($found_index = index $_, $magic_string, $block_iterator) != -1 ) {
+        print "\n" if $debug;
+        print "Found \"$magic_string\" at block \t";
+        print ( ($. - 1) * $block_size + $found_index);
+        print "\n";
+        $block_iterator = ++$found_index;
+    }
+    if ($debug) {
+        print ( ($. - 1) * $block_size );
+        print " ";
+    }
+}
