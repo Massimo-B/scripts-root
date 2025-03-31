@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+# vim: set shiftwidth=4 softtabstop=4 expandtab foldlevel=0 foldmethod=indent: # vim-modline, don't delete
+#############################################################################
+# $HGFile: usr/local/bin/1dmcrypt $
+# $HGLocation: / $
+
+# 1st Author: Massimo
+# Created: 17-08-28
+
+# $HGChecked in by: massimo $
+# $HGDate: 2018-06-20 08:39 +0200 $
+# $HGRevision: 945 $
+# $HGBranch: gentoo-mb $
+# $HGDesc: updates $
+#############################################################################
+
+# Checking Bash version
+(( ${BASH_VERSINFO[0]} >= 4 )) || die "This script needs at least bash version 4"
+
+## System Configuration #####################################################
+CONF_DMCRYPT="/etc/conf.d/dmcrypt"
+CONF_HDPARM="/etc/local.d/hdparm.start"
+#############################################################################
+
+this_basename="${0##*/}"
+this_dirname="${0%/*}"
+
+declare -A target_command
+
+usage() {
+    cat <<EOF
+Usage: $0 <action> [OPTIONS] <device>
+
+Open or close dmcrypt <device>.
+If <device> is missing then all defined devices are tried to be opened or closed.
+<device> may be any link to the blockdevice in /dev/.
+
+    Actions: (mandatory)
+    
+    open    open crypted device
+    close   close crypted device
+
+    Options:
+
+    -d, --debug             Debugging mode
+    -h, --help              Show this help
+EOF
+}
+
+logger "${this_basename}: $@"
+
+while [[ $1 == "open" || $1 == "close" ]]; do
+    case "$1" in
+        open)     opt_action="open";    shift;;
+        close)    opt_action="close";   shift;;
+        *) echo "invalid action: $1" 1>&2; usage; exit 1;;
+    esac
+done
+
+while [[ $1 == -* ]]; do
+    case "$1" in
+        -d|--debug)     opt_debug=1;    shift;;
+        -h|--help|-\?)  usage;          exit 0;;
+        -*) echo "invalid option: $1" 1>&2; usage; exit 1;;
+    esac
+done
+
+passed_device="$1"
+
+# Checks:
+if [[ -z $opt_action ]];then
+    echo "No action specified." 1>&2
+    usage
+    exit 1
+fi
+#if [[ $opt_action=="close" && -z $passed_device ]];then
+#    echo "For action close a device must be specified!"
+#    usage
+#    exit 1
+#fi
+
+[[ -n $opt_debug ]] && echo -e "Specified device: $passed_device"
+[[ -n $opt_debug ]] && echo -e "Action: $opt_action"
+
+### Parsing /etc/local.d/hdparm.start:
+
+#hdparm_params=( args_hdparm args_smartc args_sched )
+#for hdparm_param in "${hdparm_params[@]}"; do
+#    eval declare -A $hdparm_param
+#done
+#
+#if [[ $opt_action == "open" ]]; then
+#    while IFS= read -r line; do
+#        for hdparm_param in "${hdparm_params[@]}"; do
+#            if [[ $line = ${hdparm_param}[* ]]; then
+#                [[ -n $opt_debug ]] && echo -e "Found hdparm_param: $line"
+#                eval $line
+#            fi
+#        done
+#    done < ${CONF_HDPARM}
+#fi
+#
+#function func_hdparm()
+#{
+#    [[ -n $opt_debug ]] && echo -e "Executing hdparm on $@"
+#    
+#    for hd in ${!args_hdparm[@]}; do
+#        if [[ -b $hd && ( $hd == $1 || $hd == $2 ) ]]; then
+#            [[ -n $opt_debug ]] && echo "Device $hd opened and setting hdparm now:"
+#            hdparm ${args_hdparm[$hd]} $hd 2>&1 >/dev/null
+#            if (( $? != 0 )); then
+#                [[ -n $opt_debug ]] && echo "Some options not supported"
+#            fi
+#        fi
+#    done
+#
+#    for hd in ${!args_smartc[@]}; do
+#        if [[ -b $hd && ( $hd == $1 || $hd == $2 ) ]]; then
+#            [[ -n $opt_debug ]] && echo "Device $hd opened and setting smartctl now:"
+#            smartctl ${args_smartc[$hd]} $hd 2>&1 >/dev/null
+#            if (( $? != 0 )); then
+#                [[ -n $opt_debug ]] && echo "Some options not supported"
+#            fi
+#        fi
+#    done
+#
+#    for hd in ${!args_sched[@]}; do
+#        if [[ -b $hd && ( $hd == $1 || $hd == $2 ) ]]; then
+#            [[ -n $opt_debug ]] && echo "Device $hd opened and setting scheduler now:"
+#            for thistarget in $(readlink -f ${hd}); do
+#                sys_scheduler="/sys/block/"${thistarget#/dev/}"/queue/scheduler"
+#                if [[ -w $sys_scheduler ]]; then
+#                    echo "${args_sched[$hd]}" > "$sys_scheduler"
+#                    [[ -n $opt_debug ]] && cat "$sys_scheduler"
+#                else
+#                    [[ -n $opt_debug ]] && echo "Writing to $sys_scheduler failed!"
+#                fi
+#            done
+#        fi
+#    done
+#}
+
+### Parsing /etc/conf.d/dmcrypt:
+
+# Conf syntax:
+# target=mobiledata_crypt
+# source='/dev/disk/by-id/ata-ST2000LM003_HN-M201RAD_S36VJ9CH307088'
+# key='/keyfile'
+
+# echo "$0 $1" > /tmp/dmcrypt_test
+
+while IFS= read -r line; do
+    if [[ $line == target=* ]]; then
+        thistarget="${line##*=}"
+        thistarget="${thistarget//\'/}"
+        [[ -n $opt_debug ]] && echo -e "Found target: $thistarget"
+        if [[ $opt_action == "open" && -b /dev/mapper/${thistarget} ]]; then
+            [[ -n $opt_debug ]] && echo -e "\tAlready opened, skipped"
+            continue
+        fi
+        
+        while IFS= read -r nextline && [[ $nextline != source=* ]]; do
+            continue
+        done
+        thissource="${nextline#*=}"
+        thissource="${thissource//\'/}"
+        if [[ $thissource == UUID=* ]]; then
+            thissource="${thissource#*=}"
+            thissource="/dev/disk/by-uuid/${thissource}"
+        elif [[ $thissource == PARTUUID=* ]]; then
+            thissource="${thissource#*=}"
+            thissource="/dev/disk/by-partuuid/${thissource}"
+        else
+            true
+        fi
+        [[ -n $opt_debug ]] && echo -e "\tsource: $thissource"
+        
+        
+        if [[ -h $thissource ]]; then
+            thissource_resolved="$(readlink -f "${thissource}")"
+        else
+            # If link has already disappeared, try to fetch from cache:
+            [[ -n $opt_debug ]] && echo -e "\tsource $thissource could not be resolved, trying from cache..."
+            thiscachefile="/tmp/${this_basename}_${thistarget}"
+            if [[ -r "$thiscachefile" ]]; then
+                read -r thissource_resolved < "$thiscachefile"
+            else
+                [[ -n $opt_debug ]] && echo -e "\tNeither link nor cache file $thiscachefile found, maybe device was never attached?"
+                continue
+            fi
+        fi
+        
+        [[ -n $opt_debug ]] && echo -e "\tsource resolved: $thissource_resolved"
+        
+        if [[ -z $thissource_resolved ]]; then
+            [[ -n $opt_debug ]] && echo "Source could not be resolved!"
+            continue
+        fi
+        
+        while IFS= read -r nextnextline && [[ $nextnextline != key=* ]]; do
+            continue
+        done
+        thiskeyfile="${nextnextline##*=}"
+        thiskeyfile="${thiskeyfile//\'/}"
+        [[ -n $opt_debug ]] && echo -e "\tkey: $thiskeyfile"
+        
+        if [[ -z $passed_device || $passed_device == $thissource || $passed_device == $thissource_resolved  || $passed_device == $thistarget ]]; then
+            [[ -n $opt_debug ]] && echo -e "\t[OK] Matching"
+            if [[ $opt_action == "open" ]]; then
+                [[ -n $opt_debug ]] && echo -e "\nExecuting command:   cryptsetup luksOpen $thissource --key-file $thiskeyfile $thistarget"
+                eval cryptsetup luksOpen "$thissource" --key-file "$thiskeyfile" "$thistarget"
+                retval=$?
+                if (( retval == 0 )); then
+                    [[ -n $opt_debug ]] && echo -e "OK."
+                    echo "$thissource_resolved" > "/tmp/${this_basename}_${thistarget}"
+                    #func_hdparm "${thissource}" "${thissource_resolved}"
+                    rc-service autofs restart
+                else
+                    [[ -n $opt_debug ]] && echo -e "Failed!"
+                fi
+
+            elif [[ $opt_action == "close" ]]; then
+                [[ -n $opt_debug ]] && echo -e "\nTrying to umount /dev/mapper/$thistarget"
+                umount -lf /dev/mapper/$thistarget &
+                [[ -n $opt_debug ]] && echo -e "\nExecuting command:   cryptsetup luksClose $thistarget"
+                eval cryptsetup luksClose "$thistarget"
+                retval=$?
+                if [[ -n $opt_debug ]]; then
+                    if (( retval == 0 ));then
+                        echo -e "OK."
+                        rm ${opt_debug:+-v} -f "/tmp/${this_basename}_${thistarget}"
+                    else
+                        echo -e "Failed!"
+                    fi
+                fi
+
+            fi
+        else
+            [[ -n $opt_debug ]] && echo -e "\t[!!] Skipped"
+        fi
+    fi
+done < ${CONF_DMCRYPT}
+
