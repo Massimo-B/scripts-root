@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+this_basename="${0##*/}"
+
+alias_latest="latest"
+
+default_configfile="/etc/btrbk/btrbk.conf"
+
+usage() {
+    cat <<EOF
+This is $this_basename
+
+Usage: $this_basename [OPTIONS] <additional directories to scan>
+
+Description:
+All btrbk snapshot (variable "snapshot_dir") and target dirs (variable "target") are parsed from
+configuration file in order to add a "latest ->" symlink pointing to the latest snapshot.
+
+If no configuration file is set, then /etc/btrbk/btrbk.conf is used.
+
+Options:
+    -c, --config    configuration file (default: $default_configfile)
+    -h, --help      Show this help
+    -d, --debug     Debugging mode
+    
+EOF
+}
+
+latest() {
+    for subdir in "${1:-.}"/*; do
+        [[ -h "${subdir}" ]] && continue
+        subdirs+=("$subdir")
+    done
+    readarray -t subdirs_sorted < <(printf '%s\n' "${subdirs[@]}" |sort)
+    if [[ ${subdirs_sorted[-1]} != *"*" ]]; then
+        printf '%s\n' "${subdirs_sorted[-1]}";
+    fi
+} ## Usage: latest [dir]
+
+printlist() {
+    for item in $@; do
+        printf "\t%s\n" $item
+    done
+    printf "\n"
+}
+
+configfile="$default_configfile"
+
+while [[ $1 == -* ]]; do
+    case "$1" in
+        -c|--config)    shift
+                        if [[ $1 == -* || -z $1 ]]; then
+                            die "No config file given"
+                        fi
+                        configfile="${1}";          shift;;
+        -d|--debug)     opt_debug=1;                shift;;
+        -h|--help)      usage;                      exit 0;;
+        -*) echo "invalid option: $1" 1>&2; usage;  exit 1;;
+    esac
+done
+[[ -n $opt_debug ]] && echo "Config file: $configfile"
+
+additional_dirs=$@
+[[ -n $opt_debug ]] && echo "Additional dirs:" && printlist ${additional_dirs[@]}
+
+volumes=( $(grep -e "^volume\s*/" "${configfile}" | awk '{print $2}') )
+snapshot_dirs=( $(grep -e "snapshot_dir " "${configfile}" |grep -v "^#" |awk '{print $2}' |sort -u) )
+[[ -n $opt_debug ]] && echo "snapshot dirs:" && printlist ${snapshot_dirs[@]}
+target_dirs=( $(grep "target " "${configfile}" |grep -v "^#" |awk '{print $3}' |sort -u) )
+[[ -n $opt_debug ]] && echo "target dirs:" && printlist ${target_dirs[@]}
+
+all_dirs=( ${additional_dirs[@]} ${target_dirs[@]} )
+for volume in "${volumes[@]}"; do
+    for snapshot_dir in "${snapshot_dirs[@]}"; do
+        all_dirs+=("${volume%/}/${snapshot_dir%/}")
+    done
+done
+[[ -n $opt_debug ]] && echo "all dirs:" && printlist ${all_dirs[@]}
+
+readarray -t all_dirs_sorted < <(printf '%s\n' "${all_dirs[@]}" |sort -u)
+
+for target in "${all_dirs_sorted[@]}"; do
+    [[ -n $opt_debug ]] && echo "Target: $target"
+    if [[ ! -d $target ]]; then
+        [[ -n $opt_debug ]] && echo "... does not exist, skipped"
+        continue
+    fi
+    latest_path="$(latest $target)"
+    [[ -n $opt_debug ]] && echo "Latest path: $latest_path"
+    if [[ -n $latest_path ]]; then
+        latest_name="$(basename ${latest_path})"
+        if [[ "${target}/${latest_name}" -ef "${target}/${alias_latest}" ]]; then
+            [[ -n $opt_debug ]] && echo "... already set"
+            continue
+        fi
+        #rm -fv "${target}/${alias_latest}"
+        [[ -n $opt_debug ]] && echo "... linking to $latest_path"
+        ln -sfvn "${latest_name}" "${target}/${alias_latest}"
+    fi
+done
