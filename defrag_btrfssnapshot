@@ -40,8 +40,8 @@ while [[ $1 == -* ]]; do
 done
 
 target_snapshot="${1}";shift
-sibling_snapshots=("${@}");shift
-defragdir_tmp="$(dirname ${target_snapshot})/${this_basename}.$$"
+sibling_snapshots=("${@}")
+defragdir_tmp="$(dirname "${target_snapshot}")/${this_basename}.$$"
 
 [[ -n $opt_debug ]] && echo "Target snapshot: ${target_snapshot}"
 [[ -n $opt_debug ]] && echo "Sibling snapshots: ${sibling_snapshots[@]}"
@@ -80,7 +80,13 @@ if [[ ! -w "${defragdir_tmp}" ]]; then
     exit 1
 fi
 
-cd "${target_snapshot}"
+if [[ -d "${target_snapshot}" ]]; then
+    cd "${target_snapshot}"
+else
+    echo "Directory ${target_snapshot} does not exist"
+    exit 1
+fi
+
 while read -r target_file; do
     [[ -n $opt_debug ]] && echo "##################### ${target_file}"
     if [[ -r "${target_file}" ]]; then
@@ -97,5 +103,5 @@ while read -r target_file; do
     else
         [[ -n $opt_debug ]] && echo "File is not readable: ${target_file}"
     fi
-done < <(find -type f)
+done < <(find . -type f)
 
