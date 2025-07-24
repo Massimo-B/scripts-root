@@ -54,7 +54,8 @@ while [[ $1 == -* ]]; do
     case "$1" in
         -c|--config)    shift
                         if [[ $1 == -* || -z $1 ]]; then
-                            die "No config file given"
+                            echo "No config file given"
+                            exit 1
                         fi
                         configfile="${1}";          shift;;
         -d|--debug)     opt_debug=1;                shift;;
