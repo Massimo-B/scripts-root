@@ -19,6 +19,13 @@ Options:
 EOF
 }
 
+cleanup() {
+    if ! rmdir -v "${defragdir_tmp}"; then
+        echo "Failed to remove ${defragdir_tmp}"
+        exit 1
+    fi
+}
+
 while [[ $1 == -* ]]; do
     case "$1" in
         -d|--debug)     opt_debug=1;                shift;;
@@ -27,15 +34,56 @@ while [[ $1 == -* ]]; do
     esac
 done
 
+set -x
+
 target_snapshot="${1}";shift
-sibling_snapshots="${1}";shift
+sibling_snapshots="${@}";shift
+defragdir_tmp="$(dirname ${target_snapshot})/${this_basename}.$$"
 
-[[ -n opt_debug ]] && echo "target_snapshot: ${target_snapshot}"
-[[ -n opt_debug ]] && echo "sibling_snapshots: ${sibling_snapshots}"
+[[ -n opt_debug ]] && echo "Target snapshot: ${target_snapshot}"
+[[ -n opt_debug ]] && echo "Sibling snapshots: ${sibling_snapshots[@]}"
+[[ -n opt_debug ]] && echo "Temporary defrag directory: ${defragdir_tmp}"
 
+if ! btrfs subvolume show "${target_snapshot}" | grep "Flags:.*readonly" > /dev/null; then
+    echo "${target_snapshot} is not a RO snapshot"
+    exit 1
+fi
+
+for sibling_snapshot in "${sibling_snapshots[@]}"; do
+    if ! btrfs subvolume show "${sibling_snapshot}" | grep "Flags:.*readonly" > /dev/null; then
+        echo "${sibling_snapshot} is not a RO snapshot"
+        exit 1
+    fi
+done
+
+trap cleanup EXIT
+
+if ! mkdir "${defragdir_tmp}"; then
+    echo "Failed creating temoprary directory ${defragdir_tmp}"
+    exit 1
+fi
+
+if [[ ! -w "${defragdir_tmp}" ]]; then
+    echo "${defragdir_tmp} is not writeable"
+    exit 1
+fi
 
 cd "${target_snapshot}"
-while read -r targetfile; do
-    [[ -n opt_debug ]] && echo "$targetfile"
-    [[ -n opt_debug ]] && echo "${targetfile}"
+while read -r target_file; do
+    [[ -n opt_debug ]] && echo "##################### ${target_file}"
+    if [[ -r "${target_file}" ]]; then
+        ls -al "${target_file}"
+        
+        for sibling_snapshot in "${sibling_snapshots[@]}"; do
+            sibling_file="${sibling_snapshot}/${target_file}"
+            if [[ -r "${sibling_file}" ]]; then
+                ls -al "${sibling_file}"
+            else
+                [[ -n opt_debug ]] && echo "No sibling file found for snapshot ${sibling_snapshot}"
+            fi
+        done
+    else
+        [[ -n opt_debug ]] && echo "File is not readable: ${target_file}"
+    fi
 done < <(find -type f)
+
