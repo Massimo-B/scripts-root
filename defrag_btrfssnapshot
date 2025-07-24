@@ -41,16 +41,20 @@ done
 
 target_snapshot="${1}";shift
 sibling_snapshots=("${@}")
-defragdir_tmp="$(dirname "${target_snapshot}")/${this_basename}.$$"
+
+defragdir_tmp="$(mktemp -d "$(dirname "${target_snapshot}")/${this_basename}.XXXXXX")" || {
+    echo "Failed to create temporary directory"
+    exit 1
+}
 
 [[ -n $opt_debug ]] && echo "Target snapshot: ${target_snapshot}"
 [[ -n $opt_debug ]] && echo "Sibling snapshots: ${sibling_snapshots[@]}"
 [[ -n $opt_debug ]] && echo "Temporary defrag directory: ${defragdir_tmp}"
 
-if ! btrfs subvolume show "${target_snapshot}" | grep "Flags:.*readonly" > /dev/null; then
+btrfs subvolume show "${target_snapshot}" | grep "Flags:.*readonly" > /dev/null || {
     echo "${target_snapshot} is not a RO snapshot"
     exit 1
-fi
+}
 
 new_sibling_snapshots=()
 
@@ -61,19 +65,19 @@ for sibling_snapshot in "${sibling_snapshots[@]}"; do
     else
         found=1
     fi
-    if ! btrfs subvolume show "${sibling_snapshot}" | grep "Flags:.*readonly" > /dev/null; then
+    btrfs subvolume show "${sibling_snapshot}" | grep "Flags:.*readonly" > /dev/null || {
         echo "${sibling_snapshot} is not a RO snapshot"
         exit 1
-    fi
+    }
 done
 sibling_snapshots=("${new_sibling_snapshots}")
 
 trap cleanup EXIT
 
-if ! mkdir "${defragdir_tmp}"; then
+mkdir "${defragdir_tmp}" || {
     echo "Failed creating temoprary directory ${defragdir_tmp}"
     exit 1
-fi
+}
 
 if [[ ! -w "${defragdir_tmp}" ]]; then
     echo "${defragdir_tmp} is not writeable"
