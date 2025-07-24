@@ -47,9 +47,9 @@ defragdir_tmp="$(mktemp -d "$(dirname "${target_snapshot}")/${this_basename}.XXX
     exit 1
 }
 
-[[ -n $opt_debug ]] && echo "Target snapshot: ${target_snapshot}"
-[[ -n $opt_debug ]] && echo "Sibling snapshots: ${sibling_snapshots[@]}"
-[[ -n $opt_debug ]] && echo "Temporary defrag directory: ${defragdir_tmp}"
+[[ -n "$opt_debug" ]] && echo "Target snapshot: ${target_snapshot}"
+[[ -n "$opt_debug" ]] && echo "Sibling snapshots: ${sibling_snapshots[@]}"
+[[ -n "$opt_debug" ]] && echo "Temporary defrag directory: ${defragdir_tmp}"
 
 btrfs subvolume show "${target_snapshot}" | grep "Flags:.*readonly" > /dev/null || {
     echo "${target_snapshot} is not a RO snapshot"
@@ -92,7 +92,7 @@ else
 fi
 
 while read -r target_file; do
-    [[ -n $opt_debug ]] && echo "##################### ${target_file}"
+    [[ -n "$opt_debug" ]] && echo "##################### ${target_file}"
     if [[ -r "${target_file}" ]]; then
         ls -al "${target_file}"
         
@@ -101,11 +101,11 @@ while read -r target_file; do
             if [[ -r "${sibling_file}" ]]; then
                 ls -al "${sibling_file}"
             else
-                [[ -n $opt_debug ]] && echo "No sibling file found for snapshot ${sibling_snapshot}"
+                [[ -n "$opt_debug" ]] && echo "No sibling file found for snapshot ${sibling_snapshot}"
             fi
         done
     else
-        [[ -n $opt_debug ]] && echo "File is not readable: ${target_file}"
+        [[ -n "$opt_debug" ]] && echo "File is not readable: ${target_file}"
     fi
 done < <(find . -type f)
 
