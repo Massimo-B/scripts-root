@@ -18,6 +18,10 @@ configuration file in order to add a "latest ->" symlink pointing to the latest 
 
 If no configuration file is set, then /etc/btrbk/btrbk.conf is used.
 
+Example fcron entries:
+@mail(0)  30            $this_basename /mnt/archive/*/* /mnt/local/data/archive/*/*
+%daily    * 05-10,14-17 ionice -c 3 schedtool -D -e btrbk -c /etc/btrbk/btrbk.conf run cron && $this_basename -c /etc/btrbk/btrbk.conf /mnt/archive/*/* /mnt/local/data/archive/*/*
+
 Options:
     -c, --config    configuration file (default: $default_configfile)
     -h, --help      Show this help
