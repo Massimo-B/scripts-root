@@ -89,12 +89,23 @@ fi
 while read -r target_file; do
     [[ -n "$opt_debug" ]] && echo "##################### ${target_file}"
     if [[ -r "${target_file}" ]]; then
-        ls -al "${target_file}"
+        cp -f --reflink=always "${target_file}" defragged || {
+            echo "Copy ${target_file} failed"
+            exit 1
+        }
+        btrfs fi defrag -t 512M defragged || {
+            echo "Defragmentation of ${target_file} failed"
+            exit 1
+        }
+        size="$(stat -c %s defragged)"
         
         for sibling_snapshot in "${sibling_snapshots[@]}"; do
             sibling_file="${sibling_snapshot}/${target_file}"
             if [[ -r "${sibling_file}" ]]; then
-                ls -al "${sibling_file}"
+                btrfs-extent-same "$size" defragged 0 "${sibling_file}" || {
+                    echo "btrfs-extent-same on ${sibling_file} failed"
+                    exit 1
+                }
             else
                 [[ -n "$opt_debug" ]] && echo "No sibling file found for snapshot ${sibling_snapshot}"
             fi
