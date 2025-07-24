@@ -74,11 +74,6 @@ sibling_snapshots=("${new_sibling_snapshots}")
 
 trap cleanup EXIT
 
-mkdir "${defragdir_tmp}" || {
-    echo "Failed creating temoprary directory ${defragdir_tmp}"
-    exit 1
-}
-
 if [[ ! -w "${defragdir_tmp}" ]]; then
     echo "${defragdir_tmp} is not writeable"
     exit 1
