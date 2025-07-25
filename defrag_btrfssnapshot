@@ -73,7 +73,7 @@ trap cleanup EXIT
 
 ### Verbose header:
 if [[ -n "$opt_verbose" ]]; then
-    [[ -n "${opt_dryrun}" ]] && echo "##### DRY RUN #####"
+    [[ -z "${opt_dryrun}" ]] && echo "##### DRY RUN #####"
     printf "%-20s %s\n" "Target snapshot:" "$target_snapshot"
 
     if [[ ${#sibling_snapshots[@]} -gt 0 ]]; then
@@ -137,21 +137,21 @@ while IFS= read -r -d '' target_file; do
     relpath="${target_file#./}"
     [[ -n "$opt_verbose" ]] && echo "##################### ${relpath}"
     if [[ -r "${target_file}" ]]; then
-        [[ -n "${opt_dryrun}" ]] && cp -f --reflink=always "${relpath}" "${defragfile}" || {
+        [[ -z "${opt_dryrun}" ]] && cp -f --reflink=always "${relpath}" "${defragfile}" || {
             echo "Copy ${target_file} failed"
             exit 1
         }
-        [[ -n "${opt_dryrun}" ]] && btrfs filesystem defragment -t 512M "${defragfile}" || {
+        [[ -z "${opt_dryrun}" ]] && btrfs filesystem defragment -t 512M "${defragfile}" || {
             echo "Defragmentation of ${target_file} failed"
             exit 1
         }
-        [[ -n "${opt_dryrun}" ]] && size="$(stat -c %s "${defragfile}")"
+        [[ -z "${opt_dryrun}" ]] && size="$(stat -c %s "${defragfile}")"
         [[ -n "$opt_verbose" ]] && echo "Size: ${size}"
         for sibling_snapshot in "${sibling_snapshots[@]}"; do
             sibling_file="${sibling_snapshot}/${relpath}"
             [[ -n "$opt_verbose" ]] && echo "Sibling file: ${sibling_file}"
             if [[ -r "${sibling_file}" ]]; then
-                [[ -n "${opt_dryrun}" ]] && btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
+                [[ -z "${opt_dryrun}" ]] && btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
                     echo "btrfs-extent-same on ${sibling_file} failed"
                 }
             else
