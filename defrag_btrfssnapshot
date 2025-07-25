@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 this_basename="${0##*/}"
-#set -x
 
 usage() {
     cat <<EOF
@@ -67,6 +66,7 @@ while [[ $1 == -* ]]; do
     case "$1" in
         -v|--verbose)   opt_verbose=1;              shift;;
         -n|--dry-run)   opt_dryrun=1;               shift;;
+        -d|--debug)     opt_dryrun=1;               shift;;
         -h|--help)      usage;                      exit 0;;
         -*) echo "invalid option: $1" 1>&2; usage;  exit 1;;
     esac
@@ -74,6 +74,8 @@ done
 
 target_snapshot="${1}";shift
 sibling_snapshots=("${@}")
+
+[[ -n "$opt_debug" ]] && set -x
 
 defragdir_tmp="$(mktemp -d -p "$(dirname "${target_snapshot}")" "${this_basename}.XXXXXX")" || {
     echo "Failed to create temporary directory"
@@ -131,7 +133,7 @@ done
 sibling_snapshots=("${new_sibling_snapshots}")
 
 if [[ ! -w "${defragdir_tmp}" ]]; then
-    echo "${defragdir_tmp} is not writeable"
+    echo "${defragdir_tmp} is not writable"
     exit 1
 fi
 
