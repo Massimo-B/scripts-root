@@ -19,6 +19,8 @@ Options:
     -h, --help      Show this help
     -d, --debug     Debugging mode
     
+Requires: duperemove (for btrfs-extent-same), btrfs-progs, coreutils
+    
 EOF
 }
 
@@ -129,9 +131,10 @@ cd "${target_snapshot}" || {
 
 ### Main loop:
 while IFS= read -r -d '' target_file; do
-    [[ -n "$opt_verbose" ]] && echo "##################### ${target_file}"
+    relpath="${target_file#./}"
+    [[ -n "$opt_verbose" ]] && echo "##################### ${relpath}"
     if [[ -r "${target_file}" ]]; then
-        cp -f --reflink=always "${target_file}" "${defragfile}" || {
+        cp -f --reflink=always "${relpath}" "${defragfile}" || {
             echo "Copy ${target_file} failed"
             exit 1
         }
@@ -142,7 +145,7 @@ while IFS= read -r -d '' target_file; do
         size="$(stat -c %s "${defragfile}")"
         [[ -n "$opt_verbose" ]] && echo "Size: ${size}"
         for sibling_snapshot in "${sibling_snapshots[@]}"; do
-            sibling_file="${sibling_snapshot}/${target_file}"
+            sibling_file="${sibling_snapshot}/${relpath}"
             [[ -n "$opt_verbose" ]] && echo "Sibling file: ${sibling_file}"
             if [[ -r "${sibling_file}" ]]; then
                 btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
