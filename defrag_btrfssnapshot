@@ -42,6 +42,10 @@ type -p btrfs >/dev/null || {
     echo "btrfs not found, install package btrfs-progs"
     exit 1
 }
+type -p mktemp >/dev/null || {
+    echo "mktemp not found, from package coreutils"
+    exit 1
+}
 
 ### Parsing ARGS:
 while [[ $1 == -* ]]; do
@@ -63,12 +67,12 @@ defragdir_tmp="$(mktemp -d -p "$(dirname "${target_snapshot}")" "${this_basename
 trap cleanup EXIT
 
 ### Verbose header:
-[[ -n "$opt_verbose" ]] && echo "Target snapshot: ${target_snapshot}"
-[[ -n "$opt_verbose" ]] && echo "Sibling snapshots: ${sibling_snapshots[@]}"
-[[ -n "$opt_verbose" ]] && echo "Temporary defrag directory: ${defragdir_tmp}"
+[[ -n "$opt_verbose" ]] && printf 'Target snapshot: \t%s\n' "${target_snapshot}"
+[[ -n "$opt_verbose" ]] && printf 'Sibling snapshots: \t%s\n' "${sibling_snapshots[@]}"
+[[ -n "$opt_verbose" ]] && printf 'Temporary defrag directory: \t%s\n' "${defragdir_tmp}"
 
 ### Checks:
-btrfs subvolume show "${target_snapshot}" | grep "Flags:.*readonly" > /dev/null || {
+btrfs subvolume show "${target_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
     echo "${target_snapshot} is not a RO snapshot"
     exit 1
 }
@@ -82,7 +86,7 @@ for sibling_snapshot in "${sibling_snapshots[@]}"; do
     else
         found=1
     fi
-    btrfs subvolume show "${sibling_snapshot}" | grep "Flags:.*readonly" > /dev/null || {
+    btrfs subvolume show "${sibling_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
         echo "${sibling_snapshot} is not a RO snapshot"
         exit 1
     }
@@ -105,7 +109,7 @@ else
 fi
 
 ### Main loop:
-while read -r target_file; do
+while IFS= read -r target_file; do
     [[ -n "$opt_verbose" ]] && echo "##################### ${target_file}"
     if [[ -r "${target_file}" ]]; then
         cp -f --reflink=always "${target_file}" "${defragfile}" || {
@@ -124,7 +128,6 @@ while read -r target_file; do
             if [[ -r "${sibling_file}" ]]; then
                 btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" || {
                     echo "btrfs-extent-same on ${sibling_file} failed"
-                    exit 1
                 }
             else
                 [[ -n "$opt_verbose" ]] && echo "No sibling file found for snapshot ${sibling_snapshot}"
@@ -133,5 +136,5 @@ while read -r target_file; do
     else
         [[ -n "$opt_verbose" ]] && echo "File is not readable: ${target_file}"
     fi
-done < <(find . -type f)
+done < <(find . -type f -print0)
 
