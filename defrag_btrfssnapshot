@@ -66,7 +66,7 @@ while [[ $1 == -* ]]; do
     case "$1" in
         -v|--verbose)   opt_verbose=1;              shift;;
         -n|--dry-run)   opt_dryrun=1;               shift;;
-        -d|--debug)     opt_dryrun=1;               shift;;
+        -d|--debug)     opt_debug=1;                shift;;
         -h|--help)      usage;                      exit 0;;
         -*) echo "invalid option: $1" 1>&2; usage;  exit 1;;
     esac
