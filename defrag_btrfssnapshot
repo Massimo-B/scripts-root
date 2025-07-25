@@ -73,7 +73,17 @@ while [[ $1 == -* ]]; do
 done
 
 target_snapshot="${1}";shift
+if [[ -z "${target_snapshot}" ]]; then
+    echo "Missing <target snapshot>"
+    usage
+    exit 1
+fi
 sibling_snapshots=("${@}")
+if [[ ${#sibling_snapshots[@]} -eq 0 ]]; then
+    echo "Missing <sibling snapshots>"
+    usage
+    exit 1
+fi
 
 [[ -n "$opt_debug" ]] && set -x
 
