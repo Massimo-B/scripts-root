@@ -34,7 +34,7 @@ cleanup() {
 
 do_cmd() {
     if [[ -n "${opt_dryrun}" ]]; then
-        echo "[DRY-RUN] $*"
+        printf '[DRY-RUN] %q \n'  "$@"
     else
         "$@" || {
             echo "Command failed: $*"
@@ -84,7 +84,7 @@ trap cleanup EXIT
 
 ### Verbose header:
 if [[ -n "$opt_verbose" ]]; then
-    [[ -z "${opt_dryrun}" ]] && echo "##### DRY RUN #####"
+    [[ -n "${opt_dryrun}" ]] && echo "##### DRY RUN #####"
     printf "%-20s %s\n" "Target snapshot:" "$target_snapshot"
 
     if [[ ${#sibling_snapshots[@]} -gt 0 ]]; then
