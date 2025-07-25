@@ -17,6 +17,7 @@ $this_basename /mnt/data/snapshots/mdesk/home/home.20250725T072510+0200/ /mnt/da
 
 Options:
     -h, --help      Show this help
+    -n, --dry-run   Perform a trial run with no changes made
     -d, --debug     Debugging mode
     
 Requires: duperemove (for btrfs-extent-same), btrfs-progs, coreutils
@@ -54,6 +55,7 @@ type -p mktemp >/dev/null || {
 while [[ $1 == -* ]]; do
     case "$1" in
         -v|--verbose)   opt_verbose=1;              shift;;
+        -n|--dry-run)   opt_dryrun=1;               shift;;
         -h|--help)      usage;                      exit 0;;
         -*) echo "invalid option: $1" 1>&2; usage;  exit 1;;
     esac
@@ -71,6 +73,7 @@ trap cleanup EXIT
 
 ### Verbose header:
 if [[ -n "$opt_verbose" ]]; then
+    [[ -n "${opt_dryrun}" ]] && echo "##### DRY RUN #####"
     printf "%-20s %s\n" "Target snapshot:" "$target_snapshot"
 
     if [[ ${#sibling_snapshots[@]} -gt 0 ]]; then
@@ -134,21 +137,21 @@ while IFS= read -r -d '' target_file; do
     relpath="${target_file#./}"
     [[ -n "$opt_verbose" ]] && echo "##################### ${relpath}"
     if [[ -r "${target_file}" ]]; then
-        cp -f --reflink=always "${relpath}" "${defragfile}" || {
+        [[ -n "${opt_dryrun}" ]] && cp -f --reflink=always "${relpath}" "${defragfile}" || {
             echo "Copy ${target_file} failed"
             exit 1
         }
-        btrfs filesystem defragment -t 512M "${defragfile}" || {
+        [[ -n "${opt_dryrun}" ]] && btrfs filesystem defragment -t 512M "${defragfile}" || {
             echo "Defragmentation of ${target_file} failed"
             exit 1
         }
-        size="$(stat -c %s "${defragfile}")"
+        [[ -n "${opt_dryrun}" ]] && size="$(stat -c %s "${defragfile}")"
         [[ -n "$opt_verbose" ]] && echo "Size: ${size}"
         for sibling_snapshot in "${sibling_snapshots[@]}"; do
             sibling_file="${sibling_snapshot}/${relpath}"
             [[ -n "$opt_verbose" ]] && echo "Sibling file: ${sibling_file}"
             if [[ -r "${sibling_file}" ]]; then
-                btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
+                [[ -n "${opt_dryrun}" ]] && btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
                     echo "btrfs-extent-same on ${sibling_file} failed"
                 }
             else
