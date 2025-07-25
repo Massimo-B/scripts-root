@@ -109,14 +109,14 @@ else
 fi
 
 ### Main loop:
-while IFS= read -r target_file; do
+while IFS= read -r -d '' target_file; do
     [[ -n "$opt_verbose" ]] && echo "##################### ${target_file}"
     if [[ -r "${target_file}" ]]; then
         cp -f --reflink=always "${target_file}" "${defragfile}" || {
             echo "Copy ${target_file} failed"
             exit 1
         }
-        btrfs fi defrag -t 512M "${defragfile}" || {
+        btrfs filesystem defragment -t 512M "${defragfile}" || {
             echo "Defragmentation of ${target_file} failed"
             exit 1
         }
