@@ -84,6 +84,11 @@ if [[ -n "$opt_verbose" ]]; then
 fi
 
 ### Checks:
+if [[ ! -d "${target_snapshot}" ]]; then
+    echo "Directory ${target_snapshot} does not exist or is not a directory"
+    exit 1
+fi
+
 btrfs subvolume show "${target_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
     echo "${target_snapshot} is not a RO snapshot"
     exit 1
@@ -97,6 +102,10 @@ for sibling_snapshot in "${sibling_snapshots[@]}"; do
         new_sibling_snapshots+=("${sibling_snapshot}")
     else
         found=1
+    fi
+    if [[ ! -d "${sibling_snapshot}" ]]; then
+        echo "Directory ${sibling_snapshot} does not exist or is not a directory"
+        exit 1
     fi
     btrfs subvolume show "${sibling_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
         echo "${sibling_snapshot} is not a RO snapshot"
@@ -113,12 +122,10 @@ fi
 ### Temporary file:
 defragfile="${defragdir_tmp}/defragged"
 
-if [[ -d "${target_snapshot}" ]]; then
-    cd "${target_snapshot}"
-else
-    echo "Directory ${target_snapshot} does not exist"
+cd "${target_snapshot}" || {
+    echo "Cannot go to directory ${target_snapshot}"
     exit 1
-fi
+}
 
 ### Main loop:
 while IFS= read -r -d '' target_file; do
