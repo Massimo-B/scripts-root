@@ -32,6 +32,17 @@ cleanup() {
     }
 }
 
+do_cmd() {
+    if [[ -n "${opt_dryrun}" ]]; then
+        echo "[DRY-RUN] $*"
+    else
+        "$@" || {
+            echo "Command failed: $*"
+            exit 1
+        }
+    fi
+}
+
 ### Requirement checks:
 if (( ${BASH_VERSINFO[0]} < 4 )); then
     echo "This script needs at least bash version 4"
@@ -137,23 +148,15 @@ while IFS= read -r -d '' target_file; do
     relpath="${target_file#./}"
     [[ -n "$opt_verbose" ]] && echo "##################### ${relpath}"
     if [[ -r "${target_file}" ]]; then
-        [[ -z "${opt_dryrun}" ]] && cp -f --reflink=always "${relpath}" "${defragfile}" || {
-            echo "Copy ${target_file} failed"
-            exit 1
-        }
-        [[ -z "${opt_dryrun}" ]] && btrfs filesystem defragment -t 512M "${defragfile}" || {
-            echo "Defragmentation of ${target_file} failed"
-            exit 1
-        }
-        [[ -z "${opt_dryrun}" ]] && size="$(stat -c %s "${defragfile}")"
-        [[ -n "$opt_verbose" ]] && echo "Size: ${size}"
+        do_cmd cp -f --reflink=always "${relpath}" "${defragfile}"
+        do_cmd btrfs filesystem defragment -t 512M "${defragfile}"
+        size="$(stat -c %s "${defragfile}")"
+        echo "Size: ${size}"
         for sibling_snapshot in "${sibling_snapshots[@]}"; do
             sibling_file="${sibling_snapshot}/${relpath}"
             [[ -n "$opt_verbose" ]] && echo "Sibling file: ${sibling_file}"
             if [[ -r "${sibling_file}" ]]; then
-                [[ -z "${opt_dryrun}" ]] && btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
-                    echo "btrfs-extent-same on ${sibling_file} failed"
-                }
+                do_cmd btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0
             else
                 [[ -n "$opt_verbose" ]] && echo "No sibling file found for snapshot ${sibling_snapshot}"
             fi
