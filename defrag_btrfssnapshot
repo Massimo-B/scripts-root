@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 this_basename="${0##*/}"
+#set -x
 
 usage() {
     cat <<EOF
@@ -67,9 +68,20 @@ defragdir_tmp="$(mktemp -d -p "$(dirname "${target_snapshot}")" "${this_basename
 trap cleanup EXIT
 
 ### Verbose header:
-[[ -n "$opt_verbose" ]] && printf 'Target snapshot: \t%s\n' "${target_snapshot}"
-[[ -n "$opt_verbose" ]] && printf 'Sibling snapshots: \t%s\n' "${sibling_snapshots[@]}"
-[[ -n "$opt_verbose" ]] && printf 'Temporary defrag directory: \t%s\n' "${defragdir_tmp}"
+if [[ -n "$opt_verbose" ]]; then
+    printf "%-20s %s\n" "Target snapshot:" "$target_snapshot"
+
+    if [[ ${#sibling_snapshots[@]} -gt 0 ]]; then
+        printf "%-20s %s\n" "Sibling snapshots:" "- ${sibling_snapshots[0]}"
+        for ((i = 1; i < ${#sibling_snapshots[@]}; i++)); do
+            printf "%-20s %s\n" "" "- ${sibling_snapshots[i]}"
+        done
+    else
+        printf "%-20s\n" "Sibling snapshots:"
+    fi
+
+    printf "%-20s %s\n\n" "Temporary defrag dir:" "$defragdir_tmp"
+fi
 
 ### Checks:
 btrfs subvolume show "${target_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
@@ -126,7 +138,7 @@ while IFS= read -r -d '' target_file; do
             sibling_file="${sibling_snapshot}/${target_file}"
             [[ -n "$opt_verbose" ]] && echo "Sibling file: ${sibling_file}"
             if [[ -r "${sibling_file}" ]]; then
-                btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" || {
+                btrfs-extent-same "$size" "${defragfile}" 0 "${sibling_file}" 0 || {
                     echo "btrfs-extent-same on ${sibling_file} failed"
                 }
             else
