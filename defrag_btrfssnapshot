@@ -100,6 +100,37 @@ defragdir_tmp="$(mktemp -d -p "$(dirname "${target_snapshot}")" "${this_basename
 
 trap cleanup EXIT
 
+### Checks:
+if [[ ! -d "${target_snapshot}" ]]; then
+    echo "Directory ${target_snapshot} does not exist or is not a directory"
+    exit 1
+fi
+
+btrfs subvolume show "${target_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
+    echo "${target_snapshot} is not a RO snapshot"
+    exit 1
+}
+
+new_sibling_snapshots=()
+
+for sibling_snapshot in "${sibling_snapshots[@]}"; do
+    # Remove target snapshot from siblings list:
+    if [[ "${sibling_snapshot}" != "${target_snapshot}" ]]; then
+        new_sibling_snapshots+=("${sibling_snapshot}")
+    else
+        [[ -n "${opt_verbose}" ]] && echo "Skipped target ${sibling_snapshot} as sibling"
+    fi
+    if [[ ! -d "${sibling_snapshot}" ]]; then
+        echo "Directory ${sibling_snapshot} does not exist or is not a directory"
+        exit 1
+    fi
+    btrfs subvolume show "${sibling_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
+        echo "${sibling_snapshot} is not a RO snapshot"
+        exit 1
+    }
+done
+sibling_snapshots=("${new_sibling_snapshots[@]}")
+
 ### Verbose header:
 if [[ -n "$opt_verbose" ]]; then
     [[ -n "${opt_dryrun}" ]] && echo "##### DRY RUN #####"
@@ -117,36 +148,6 @@ if [[ -n "$opt_verbose" ]]; then
     printf "%-20s %s\n\n" "Temporary defrag dir:" "$defragdir_tmp"
 fi
 
-### Checks:
-if [[ ! -d "${target_snapshot}" ]]; then
-    echo "Directory ${target_snapshot} does not exist or is not a directory"
-    exit 1
-fi
-
-btrfs subvolume show "${target_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
-    echo "${target_snapshot} is not a RO snapshot"
-    exit 1
-}
-
-new_sibling_snapshots=()
-
-for sibling_snapshot in "${sibling_snapshots[@]}"; do
-    # Remove target snapshot from siblings list:
-    if [[ "${sibling_snapshot}" != "${target_snapshot}" || -n "$found" ]]; then
-        new_sibling_snapshots+=("${sibling_snapshot}")
-    else
-        found=1
-    fi
-    if [[ ! -d "${sibling_snapshot}" ]]; then
-        echo "Directory ${sibling_snapshot} does not exist or is not a directory"
-        exit 1
-    fi
-    btrfs subvolume show "${sibling_snapshot}" | grep -qE "Flags:\s+readonly" > /dev/null || {
-        echo "${sibling_snapshot} is not a RO snapshot"
-        exit 1
-    }
-done
-sibling_snapshots=("${new_sibling_snapshots}")
 
 if [[ ! -w "${defragdir_tmp}" ]]; then
     echo "${defragdir_tmp} is not writable"
