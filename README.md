@@ -1,10 +1,10 @@
 Collection of unsorted scripts for user root
 
 ### defrag_btrfssnapshot
-Defragmentation of a <target snapshot> (btrfs RO snapshot) without modification or breaking parent relations, applying defragmentation to all <sibling snapshots>
+Defragmentation of a target snapshot (btrfs RO snapshot) without modification or breaking parent relations, applying defragmentation to all sibling snapshots
 
 ### dmcrypt
-Open or close dmcrypt <device>
+Open or close dmcrypt device
 
 ### find-luks
 Tries to find a LUKS header on a damaged/deleted/overwritten blockdevice
